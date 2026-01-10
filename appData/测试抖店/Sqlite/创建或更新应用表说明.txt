@@ -1,0 +1,10 @@
+创建表
+在此文件夹放入 表名.sql 文件 程序执行导入应用时自动按文件名检查表是否存在 不存在才会执行创建
+
+更新表
+在此文件放入 appTableUpdate.sql 文件写入更新表sql 在导入应用完成时会执行一次
+
+
+常用sql
+SELECT * FROM sqlite_master WHERE type='table' AND name='tkInvitePlan';
+ALTER TABLE "tkInvitePlan" RENAME TO "tkInvitePlan_back1";

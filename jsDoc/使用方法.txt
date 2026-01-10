@@ -1,0 +1,5 @@
+安装
+npm install -g jsdoc
+
+生成文档
+jsdoc rpa.js -d docs

@@ -1058,19 +1058,20 @@ var bootScript = {
   //   await window.rpaVue.showFeedbackTrackDesc(desc);
   // },
   //开始运行
-  async start(params = null) {
+  async start(params = null, isDebug = false) {
     rpa.runMessageWriteRunLog = true;                         //运行日志记录到文件
     window.rpaVue.callbackStop = function () {                //注册停止回调函数
       bootScript.stop();
     };
+    bootScript.isDebug = isDebug;
     await rpa.instructMessage("开始配置任务");
-    console.log("开始加载脚本 当前环境isDebug：", bootScript.isDebug);
     //加载云脚本
     await bootScript.injectionJs(`csharpCode.js`);
     await bootScript.injectionJs(`appData.js`);
     await bootScript.injectionJs(`dbApi.js`);
     await bootScript.injectionJs(`tikTokApi.js`);
     await bootScript.injectionJs(`protobuf.js`);
+    console.log("当前环境isDebug：", bootScript.isDebug);
 
     // await rpa.wait(0);
     switch (params) {
@@ -1117,9 +1118,5 @@ var bootScript = {
   },
 
 };
-//处理运行环境
-if (instructScript.globalVar.isDebug != undefined) {
-  bootScript.isDebug = instructScript.globalVar.isDebug;
-}
 
 console.log("bootScript加载完成");

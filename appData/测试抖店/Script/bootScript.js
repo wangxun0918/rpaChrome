@@ -1,6 +1,7 @@
 //脚本入口 运行环境已经注册rpa对象 点击停止会执行 window.bootScript.stop() 
 var globalVar = instructScript.globalVar;
 var bootScript = {
+
   shopId: "",
   regionCode: "", //地区码
 
@@ -121,6 +122,7 @@ var bootScript = {
     delete reqInfo.reqHeader.Cookie;
     this.orderSearchConfig = reqInfo;
     console.log("获取到订单配置：", this.orderSearchConfig, this.lastUrlParam);
+    await rpa.sleep(1000);
     await rpa.wake("waitGetContactBuyer");
   },
 
@@ -145,7 +147,7 @@ var bootScript = {
         throw "获取地区码失败无法正常执行任务";
       }
     }
-    await rpa.injectionJs(`sliderHandle.js`, pageFindCreatorInfo.id);
+    await bootScript.injectionJs(`sliderHandle.js`, pageFindCreatorInfo.id);
     // await rpa.callPageJS(pageFindCreatorInfo.id, "sliderHandle.checkSlider", 20, 0);
 
     //#endregion
@@ -474,7 +476,7 @@ var bootScript = {
     } else {
       this.pageCreateInvite = pageCreateInvite.id;
     }
-    await rpa.injectionJs(`sliderHandle.js`, this.pageCreateInvite);
+    await bootScript.injectionJs(`sliderHandle.js`, this.pageCreateInvite);
     // await rpa.callPageJS(this.pageCreateInvite, "sliderHandle.checkSlider", 20, 0);
     await rpa.activePage(this.pageCreateInvite)
     return pageCreateInvite;
@@ -762,8 +764,8 @@ var bootScript = {
         if (await rpa.callPageRpa(this.pageFindCreator, "openPoupPage", this.childVarWinName, url, "_blank")) {
           pageChat = await rpa.getPage(chatPageKeyword, 1);
           if (pageChat) {
-            // await rpa.injectionJs(`csharpCode.js`, pageChat.id);
-            await rpa.injectionJs(`sendChat.js`, pageChat.id);
+            // await bootScript.injectionJs(`csharpCode.js`, pageChat.id);
+            await bootScript.injectionJs(`sendChat.js`, pageChat.id);
             return pageChat.id
           }
         }
@@ -915,7 +917,7 @@ var bootScript = {
 
         //检查下一页禁用按钮存在则停止
         var btnNextPageDisabled = "订单页下一页禁用"
-        if (await rpa.callPageRpa(this.pageOrderInfo.id, "waitInDoc", btnNextPageDisabled, 1, false)) {       //检查订单页下一页禁用按钮是否存在
+        if (await rpa.callPageRpa(this.pageOrderInfo.id, "waitInDoc", btnNextPageDisabled, 2, false)) {       //检查订单页下一页禁用按钮是否存在
           await rpa.runMessage("符合条件的订单全部读完 即将停止运行");
           break
         }
@@ -923,7 +925,7 @@ var bootScript = {
         var btnNextPage = "订单页下一页"
         if (await rpa.callPageRpa(this.pageOrderInfo.id, "waitInDoc", btnNextPage, 10, false)) {               //检查订单页下一页按钮是否存在
           await rpa.runMessage("获取下一页订单数据……");
-          await rpa.callPageRpa(this.pageOrderInfo.id, "click", btnNextPage)                                    //点击下一页
+          await rpa.callPageRpa(this.pageOrderInfo.id, "click", btnNextPage)                                    //点击下一页  
           await rpa.wait(30, "waitGetContactBuyer");
           continue
         }
@@ -932,9 +934,9 @@ var bootScript = {
       if (this.pageAutoChat != -1) {
         await rpa.closePage(this.pageAutoChat)                //运行结束关闭私信窗口
       }
-
       await rpa.sleep(1000);
       this.stop();
+      await rpa.runMessage(`已停止任务 共私信达人：${appData.ExecuteTaskItem.executeNum}`);
     }
 
     await taskRun();
@@ -972,6 +974,7 @@ var bootScript = {
           rpa.runMessage(`私信买家未发送`);
         } else if (sendR.sucNum > 0) {
           rpa.runMessage(`私信买家成功`);
+          appData.ExecuteTaskItem.executeNum++
           //记录达人信息
           buyerItem.chatNum = sendR.sucNum;
           buyerItem.createTime = DateTime.Now.toISOString();
@@ -1005,15 +1008,15 @@ var bootScript = {
             await rpa.regReqMon(pageChat.id, 'api/v1/shop_im/shop/conversation/create_conversation', 'window.bootScript.onCreateConversation', null, null, false)
             await rpa.callPageJS(pageChat.id, `window.location.href='${url}'`, 2)
             await rpa.wait(20, 'waitCreateConversation')
-            // await rpa.injectionJs(`csharpCode.js`, pageChat.id);
-            await rpa.injectionJs(`sendChat.js`, pageChat.id);        //不管有没有创建私信成功都注入脚本 下次成功即可直接发
+            // await bootScript.injectionJs(`csharpCode.js`, pageChat.id);
+            await bootScript.injectionJs(`sendChat.js`, pageChat.id);        //不管有没有创建私信成功都注入脚本 下次成功即可直接发
             return pageChat.id
           }
         }
         return -1;
       }
       //这里应该同时检查私信窗口是否存在 不存在则应重新打开
-      if (this.orderChildVarWinName && !appData.isDebug) {
+      if (this.orderChildVarWinName) {
         if (!pageChat) {
           //如果私信页面被关闭则重新打开
           return openPoupPage()
@@ -1061,14 +1064,13 @@ var bootScript = {
       bootScript.stop();
     };
     await rpa.instructMessage("开始配置任务");
+    console.log("开始加载脚本 当前环境isDebug：", bootScript.isDebug);
     //加载云脚本
-    await rpa.injectionJs(`csharpCode.js`);
-    await rpa.injectionJs(`appData.js`);
-    await rpa.injectionJs(`dbApi.js`);
-    await rpa.injectionJs(`tikTokApi.js`);
-    await rpa.injectionJs(`protobuf.js`);
-
-    console.log("脚本加载完成开始运行 isDebug：", appData.isDebug);
+    await bootScript.injectionJs(`csharpCode.js`);
+    await bootScript.injectionJs(`appData.js`);
+    await bootScript.injectionJs(`dbApi.js`);
+    await bootScript.injectionJs(`tikTokApi.js`);
+    await bootScript.injectionJs(`protobuf.js`);
 
     // await rpa.wait(0);
     switch (params) {
@@ -1095,6 +1097,29 @@ var bootScript = {
     }
   },
 
+  /**
+  * 是不是测试环境
+  */
+  isDebug: false,
+  /**
+   * 注册脚本到指定页 会根据环境判断使用本地脚本或远程脚本
+   * @param {*} scriptName 
+   * @param {*} id 
+   * @param {*} refreshInject 
+   * @returns 
+   */
+  async injectionJs(scriptName, id = -1, refreshInject = true) {
+    if (this.isDebug) {
+      return await rpa.injectionJs(scriptName, id, refreshInject)
+    } else {
+      return await rpa.injectionJs(`https://wangxun0918.github.io/rpaChrome/appData/测试抖店/Script/${scriptName}`, id, refreshInject)
+    }
+  },
+
 };
+//处理运行环境
+if (instructScript.globalVar.isDebug != undefined) {
+  bootScript.isDebug = instructScript.globalVar.isDebug;
+}
 
 console.log("bootScript加载完成");

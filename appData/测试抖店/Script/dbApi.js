@@ -200,14 +200,14 @@ var dbApi = {
   async checkChatBuyerExist(shopId, pigeonUid, day) {
     try {
       var dayBeforeStr = DateTime.Now.AddDays(day * -1).toISOString();
-      var hisTotal = await rpa.tableQuery('tkChatOrder', { shopId, pigeonUid, createTime: { op: '>=', value: dayBeforeStr } }, 'COUNT(*)', null, trues);
-      if (parseInt(hisTotal) > 0) {
-        return true;
+      var hisTotal = await rpa.tableQuery('tkChatOrder', { shopId, pigeonUid, createTime: { op: '>=', value: dayBeforeStr } }, 'COUNT(*)', null, true);
+      if (parseInt(hisTotal) == 0) {
+        return false;
       }
     } catch (ex) {
       await rpa.runMessage("检查订单私信历史出错：" + ex);
     }
-    return false;
+    return true;
   },
 
 

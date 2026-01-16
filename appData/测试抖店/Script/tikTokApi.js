@@ -1595,59 +1595,9 @@ message ResponseInnerMessage {
     //重试
     if (tryNumber > 0) {
       tryNumber--;
-      LogHelper.Info("getChatConfig失败重试" + tryNumber);
       return await this.getChatConfig(tryNumber);
     }
     return null;
-  },
-
-  //关闭私信窗口 1成功
-  async closeChatPopupV2(type, msg = "") {
-    if (appData.CurrentCreatorInfo == null || !appData.CurrentCreatorInfo.creatorName) {
-      return;
-    }
-
-    var name = appData.CurrentCreatorInfo.creatorName;
-    try {
-      //重复发送不扣减次数
-      if (appData.ChatedCreatorIds.Contains(name)) {
-        //关闭私信窗口
-        // appData.TalentFormV2.CloseChatPopup();
-        console.log("发现重复发送达人：" + name);
-        return;
-      }
-
-      if (type == 1) {
-        //补充数据 上报后台
-        await rpa.instructMessage(`私信进度：${appData.ExecuteTaskItem.executeNum}/${appData.ExecuteTaskItem.executeTargetNum}`);
-        await adminApi.SaveChatTalent(appData.CurrentCreatorInfo);
-        //检查停止
-        if (appData.ExecuteTaskItem.executeNum >= appData.ExecuteTaskItem.executeTargetNum) {
-          bootScript.stop();
-          // alert("本次任务已执行至定量设置上限");
-        }
-      } else {
-        var yuanYin = msg == "" ? "网络加载过慢，跨境店建议开启vpn" : msg;
-        if (msg == "已沟通有消息未回复") {
-          if (appData.ExecuteTaskItem != null) {
-            talentDal.AddExecuteLog({
-              taskId: appData.ExecuteTaskItem.id,
-              logType: "信息",
-              content: `${name}${appData.GetTranText("有待回复的信息，不执行私信回复；任务进度：")}${appData.ExecuteTaskItem.executeNum}/${appData.ExecuteTaskItem.executeTargetNum};`,
-            });
-          }
-        }
-        console.log(name + " 发送私信失败 窗口关闭 原因：" + yuanYin);
-      }
-    } catch (error) {
-      console.log(name + " 处理发送私信结果失败");
-    }
-    //关闭私信窗口
-    // appData.TalentFormV2.CloseChatPopup();
-    appData.ChatedCreatorIds.Add(name);
-    // TikTokChromeV2.browserTab1.ExecuteScriptAsync("SetExecutingChat(0);");
-
-    return;
   },
 
   /**
@@ -1700,11 +1650,11 @@ message ResponseInnerMessage {
           console.log("遇到滑块请在达人管理操作一次发送私信");
           return false;
         }
-        talentDal.AddExecuteLog({
-          taskId: appData.ExecuteTaskItem.id,
-          logType: "错误",
-          content: `发送失败：${res.message}`,
-        });
+        // talentDal.AddExecuteLog({
+        //   taskId: appData.ExecuteTaskItem.id,
+        //   logType: "错误",
+        //   content: `发送失败：${res.message}`,
+        // });
       }
     } catch (ex) {
       console.log(`${apiName}出错：` + ex);

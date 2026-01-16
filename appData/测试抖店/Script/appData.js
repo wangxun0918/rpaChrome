@@ -1,6 +1,4 @@
 var appData = {
-  isDebug: false,
-
   /**
    * 语言 1中文 2英文
    */
@@ -24,7 +22,7 @@ var appData = {
   //私信模板配置
   chatInviSettingV2: null,
   //订单买家私信模板配置
-  chatOrderBuyerSetting: null, 
+  chatOrderBuyerSetting: null,
   /**
    * 清理邀约计划
    */
@@ -205,7 +203,7 @@ var appData = {
     var minutes = padZero(date.getMinutes());
     var seconds = padZero(date.getSeconds());
 
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    return `${year} - ${month} - ${day} ${hours}: ${minutes}: ${seconds}`;
   },
   //获取md5大写32位
   getMD5x32(str) {
@@ -405,65 +403,4 @@ var appData = {
   },
 };
 
-const LogHelper = {
-  //回传日志
-  callback: null,
-
-  Info(msg) {
-    if (this.callback) {
-      this.callback(msg);
-    } else {
-      console.info("文件日志：", msg);
-    }
-  },
-};
-
-const talentDal = {
-  //回传日志
-  callback: null,
-  //运行日志
-  logItems: [],
-  //保存日志
-  async AddExecuteLog(log) {
-    await rpa.sleep(100);
-
-    log.createTimeStamp = DateTime.NowStamp().toString();
-    log.logType = appData.GetTranText(log.logType);
-    log.content = appData.GetTranText(log.content);
-
-    if (this.callback) {
-      this.callback(log);
-    } else {
-      console.info("运行日志：", log);
-    }
-    // this.logItems.push(log);
-  },
-  async AddExecuteLogV2(content, type = "信息") {
-    if (!appData.ExecuteTaskItem) {
-      return;
-    }
-
-    var log = {
-      taskId: appData.ExecuteTaskItem.id,
-      logType: type,
-      content: content,
-    };
-
-    await rpa.sleep(100);
-    log.createTimeStamp = DateTime.NowStamp().toString();
-    log.logType = appData.GetTranText(log.logType);
-    log.content = appData.GetTranText(log.content);
-
-    if (this.callback) {
-      this.callback(log);
-    } else {
-      console.info("运行日志：", log);
-    }
-    // this.logItems.push(log);
-  },
-};
-
-// if (rpa.debug) {
-//   appData.isDebug = rpa.debug;
-// }
 console.info("appData加载完成");

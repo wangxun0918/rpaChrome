@@ -226,7 +226,7 @@ var bootScript = {
     }
     await rpa.instructMessage("等待配置任务参数");
     // console.log("弹窗输入数据：", globalVar.AppRunParameters);
-    globalVar.AppRunParameters = await rpa.showDialogForm(`createTkInvite.html`, JSON.stringify(globalVar.AppRunParameters), 1100, 700, -1, -1, true);
+    globalVar.AppRunParameters = await bootScript.showDialogForm(`createTkInvite.html`, JSON.stringify(globalVar.AppRunParameters), 1100, 700, -1, -1, true);
     if (!globalVar.AppRunParameters) {
       return;
     }
@@ -239,7 +239,7 @@ var bootScript = {
     if (!globalVar.AppRunParameters.currConfig.useOldParam) {
       //取达人配置
       rpa.runMessage("请在查找达人配置好筛选条件 点击关键字旁搜索按钮 进入下一步");
-      globalVar.AppRunParameters = await rpa.showDialogForm(`createTkInvite.html?step=2`, JSON.stringify(globalVar.AppRunParameters), 800, 175, -1, 0, true);
+      globalVar.AppRunParameters = await bootScript.showDialogForm(`createTkInvite.html?step=2`, JSON.stringify(globalVar.AppRunParameters), 800, 175, -1, 0, true);
       if (!globalVar.AppRunParameters) {
         rpa.runMessage("未配置完成任务 结束运行");
         return;
@@ -259,7 +259,7 @@ var bootScript = {
       var keyword3 = `api/v1/oec/affiliate/seller/invitation_group/create`;
       await rpa.regReqMon(this.pageCreateInvite, keyword3, `window.bootScript.onInvite`, null, null, false, { code: 1, message: "获取邀约配置成功 本次邀约请求已截取未发送 请点击任务页面立即执行" });
       rpa.runMessage("请在邀约页面选1个达人其它条件配置好 点击发送（本次发送会拦截将记录配置后续为您自动寻找达人发送）");
-      globalVar.AppRunParameters = await rpa.showDialogForm(`createTkInvite.html?step=3`, JSON.stringify(globalVar.AppRunParameters), 800, 175, -1, 0, true);
+      globalVar.AppRunParameters = await bootScript.showDialogForm(`createTkInvite.html?step=3`, JSON.stringify(globalVar.AppRunParameters), 800, 175, -1, 0, true);
       if (!globalVar.AppRunParameters) {
         rpa.runMessage("未配置完成任务 结束运行");
         return;
@@ -526,7 +526,7 @@ var bootScript = {
     }
     await rpa.instructMessage("等待配置任务参数");
     // console.log('弹窗参数：', globalVar.AppRunParameters);
-    globalVar.AppRunParameters = await rpa.showDialogForm(`createTkChat.html`, JSON.stringify(globalVar.AppRunParameters), 1500, 950, -1, -1, true);
+    globalVar.AppRunParameters = await bootScript.showDialogForm(`createTkChat.html`, JSON.stringify(globalVar.AppRunParameters), 1500, 950, -1, -1, true);
     if (!globalVar.AppRunParameters) {
       return;
     }
@@ -538,7 +538,7 @@ var bootScript = {
     if (!globalVar.AppRunParameters.currConfig.useOldParam) {
       //取达人配置
       rpa.runMessage("请在查找达人配置好筛选条件 点击关键字旁搜索按钮 进入下一步");
-      globalVar.AppRunParameters = await rpa.showDialogForm(`createTkChat.html?step=2`, JSON.stringify(globalVar.AppRunParameters), 800, 175, -1, 0, true);
+      globalVar.AppRunParameters = await bootScript.showDialogForm(`createTkChat.html?step=2`, JSON.stringify(globalVar.AppRunParameters), 800, 175, -1, 0, true);
       if (!globalVar.AppRunParameters) {
         rpa.runMessage("未配置完成任务 结束运行");
         return;
@@ -840,7 +840,7 @@ var bootScript = {
     }
 
     await rpa.instructMessage("打开店铺订单->管理订单页 设置筛选条件点击下一步");
-    await rpa.showDialogForm(`createTkOrderChat.html?step=1`, JSON.stringify(globalVar.AppRunParameters), 800, 175, -1, 0, true);       //打开窗口提示操作下一步
+    await bootScript.showDialogForm(`createTkOrderChat.html?step=1`, JSON.stringify(globalVar.AppRunParameters), 800, 175, -1, 0, true);       //打开窗口提示操作下一步
 
     var keyword = `api/seller/mGetContactBuyerLinkByOrder`;             //订单接口关键字 监控获取店铺信息
     await rpa.regReqMon(this.pageOrderInfo.id, keyword, `window.bootScript.onGetContactBuyer`, null, null, false);
@@ -855,7 +855,7 @@ var bootScript = {
 
     await rpa.instructMessage("等待配置任务参数");
     // console.log('弹窗参数：', globalVar.AppRunParameters);
-    globalVar.AppRunParameters = await rpa.showDialogForm(`createTkOrderChat.html?step=2`, JSON.stringify(globalVar.AppRunParameters), 1500, 950, -1, -1, true);
+    globalVar.AppRunParameters = await bootScript.showDialogForm(`createTkOrderChat.html?step=2`, JSON.stringify(globalVar.AppRunParameters), 1500, 950, -1, -1, true);
     if (!globalVar.AppRunParameters) {
       return;
     }
@@ -1116,6 +1116,25 @@ var bootScript = {
       return await rpa.injectionJs(`https://wangxun0918.github.io/rpaChrome/appData/测试抖店/Script/${scriptName}`, id, refreshInject)
     }
   },
+  /**
+   * 加载显示html页面弹窗 会根据环境判断使用本地脚本或远程脚本
+   * @param {*} htmlName 
+   * @param {*} jsonAppConfig 
+   * @param {*} width 
+   * @param {*} height 
+   * @param {*} left 
+   * @param {*} top 
+   * @param {*} topMost 
+   * @param {*} waitLoadSecoend 
+   * @returns 
+   */
+  async showDialogForm(htmlName, jsonAppConfig = null, width = 1000, height = 700, left = -1, top = -1, topMost = false, waitLoadSecoend = 1) {
+    if (this.isDebug) {
+      return await rpa.showDialogForm(htmlName, jsonAppConfig, width, height, left, top, topMost, waitLoadSecoend)
+    } else {
+      return await rpa.showDialogForm(`https://wangxun0918.github.io/rpaChrome/appData/测试抖店/Html/${htmlName}`, jsonAppConfig, width, height, left, top, topMost, waitLoadSecoend)
+    }
+  }
 
 };
 

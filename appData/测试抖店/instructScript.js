@@ -10,7 +10,8 @@ await window.rpaVue.feedbackTrack(1, 4, 6, localVar, this.globalVar, 'mainFlow�
 await rpa.injectionJs(`bootScript.js`, -1);
 //自定义代码片段 适合场景：手动修改脚本后将代码到指定位置、注入脚本执行方法 
 await window.rpaVue.feedbackTrack(2, 4, 7, localVar, this.globalVar, 'mainFlow流程 执行第 3 条指令【Javascript片段】');
-instructScript.globalVar.isDebug=false;  await bootScript.start('订单私信');       //邀约 私信 订单私信
+await bootScript.start('私信', true);       //邀约 私信 订单私信
+
 
 await window.rpaVue.feedback('mainFlow流程 执行结束');
 await window.rpaVue.executeEnd();

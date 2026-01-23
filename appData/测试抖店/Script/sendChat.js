@@ -262,6 +262,7 @@ var storeSendChat = {
         if (!elSend) {
             throw '未发现发消息按钮';
         }
+         await rpa.sleep(500)
         storeSendChat.writeLog('点击发送消息按钮');
         rpa.clickCEF(elSend);
         await rpa.sleep(1000)

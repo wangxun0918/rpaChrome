@@ -85,6 +85,19 @@ var ____rpaName____ = {
         }
     },
     /**
+     * 点击图片
+     * @param {any} templateImg 模板图 如D:\test.png 或应用目录Image文件夹下文件名如test.png
+     * @param {any} threshold 匹配阈值（0~1，推荐值0.7到0.9 越接近1越严格 如果两张图片是从不同大小的相同背景截取下来的匹配度会大大降低 0.4以下才能匹配）
+     * @param {any} bgImgWidth 桌面宽度缩放为指定宽度 0表示不调整 主要解决换机器或桌面分辨率改变后模板图无法匹配模板图问题 设置截取图时的桌面分辨率即可 如1920
+     * @param {any} bgImgHeight 桌面高度缩放为指定高度 如1080
+     * @param {any} throwEx 是否抛出异常
+     */
+    async clickImg(templateImg, threshold = 0.8, bgImgWidth = 0, bgImgHeight = 0, throwEx = true) {
+        //先悬停再点击
+        await this.hoverImg(templateImg, threshold, bgImgWidth, bgImgHeight, throwEx);
+        await this.rpaApi.mouseClick(0, 0, true, false, true)
+    },
+    /**
      * 获取元素文本 返回数组每个元素是个对象包含 会等待5秒元素出现 如果需要等待更长时间就使用等待指令
      * @param {any} elName 元素库保存的元素名
      * @param {any} getFirstInnerText 只取第一个元素的innerText 直接返回个字符串
@@ -173,7 +186,14 @@ var ____rpaName____ = {
             }
         }
     },
-
+    /**
+     * 输入文本 使用系统模拟输入
+     * @param {any} content 文本内容
+     * @param {any} speed speed范围1到100 越大越快
+     */
+    async inputTextWin(content, speed = 50) {
+        return await this.rpaApi.inputText(content, speed);
+    },
     /**
      * 等待元素消失在文档中 返回true则表示消失 false或者异常表示未消失
      * @param {any} elName 元素库保存的元素名
@@ -259,6 +279,35 @@ var ____rpaName____ = {
         }
     },
     /**
+     * 等待图片出现在屏幕可视区域中
+     * @param {any} templateImg 应用图片文件夹文件名或完整路劲
+     * @param {any} threshold
+     * @param {any} bgImgWidth
+     * @param {any} bgImgHeight
+     * @param {any} waitSecond  等待秒数 默认20秒
+     * @param {any} throwEx 超时不存在是否抛出异常 默认true  检测元素是否存在传false
+     * @returns
+     */
+    async waitVisibleImg(templateImg, threshold = 0.8, bgImgWidth = 0, bgImgHeight = 0, waitSecond = 20, throwEx = true) {
+        for (var i = 0; i < waitSecond; i++) {
+            if (this.stop) { break; }
+            await this.sleep(1000);
+            let posiResp = JSON.parse(await this.ocrFindImgPosi(templateImg, null, threshold, bgImgWidth, bgImgHeight));
+            if (posiResp.code == 200 && posiResp.data && posiResp.data.findImagePosiItems && posiResp.data.findImagePosiItems.length > 0) {
+                let rect = posiResp.data.findImagePosiItems[0];
+                return rect;
+                break;
+            } else {
+                //this.error(`图片识别失败：`, posiResp);
+            }
+        }
+        if (throwEx) {
+            throw `等待图片 ${templateImg} 出现在可视区域中超时`;
+        } else {
+            return null;
+        }
+    },
+    /**
      * 鼠标悬停在元素上 返回true成功
      * @param {any} elName 元素库保存的元素名 
      * @param {any} throwEx 超时不存在是否抛出异常 默认true  检测元素是否存在传false
@@ -272,6 +321,24 @@ var ____rpaName____ = {
         this.elementMoveVisible(el, "center", true);
         if (useWinApi) await this.focusChromeForm(useWinApi);
         await this.hoverCEF(el, useWinApi);
+        await this.sleep(200);
+        return true;
+    },
+    /**
+     * 鼠标悬停在图片上 返回true成功
+     * @param {any} templateImg
+     * @param {any} threshold
+     * @param {any} bgImgWidth
+     * @param {any} bgImgHeight
+     * @param {any} throwEx 超时不存在是否抛出异常 默认true
+     * @returns
+     */
+    async hoverImg(templateImg, threshold = 0.8, bgImgWidth = 0, bgImgHeight = 0, throwEx = true) {
+        var rect = await this.waitVisibleImg(templateImg, threshold, bgImgWidth, bgImgHeight, 20, throwEx);
+        if (!rect) {
+            return false;
+        }
+        await this.rpaApi.mouseHover(rect.left + rect.width / 2, rect.top + rect.height / 2, true, true, true)
         await this.sleep(200);
         return true;
     },
@@ -1739,6 +1806,33 @@ ${valuesClauses.join(',\n')};`;
         }
         return JSON.stringify(result);
     },
+    /**
+     * 识别图片在屏幕截图位置矩形 注意只能在主显示器截图查找 多显示器不支持
+     * @param {any} templateImg 模板图 如D:\test.png 或应用目录Image文件夹下文件名如test.png
+     * @param {any} bgImg 背景图传null则表示取主显示器截图 如D:\test.png 或应用目录Image文件夹下文件名如test.png
+     * @param {any} threshold 匹配阈值（0~1，推荐值0.7到0.9 越接近1越严格 如果两张图片是从不同大小的相同背景截取下来的匹配度会大大降低 0.4以下才能匹配）
+     * @param {any} bgImgWidth 背景图片缩放为指定宽度 0表示用当前传入的背景图不调整 主要用于解决背景图片和截取的模板图片时的背景图大小不一致问题
+     * @param {any} bgImgHeight 背景图片缩放为指定高度
+     * @returns 响应识别结果字符串 { code: 200, data: 'xxxx' }
+     */
+    async ocrFindImgPosi(templateImg, bgImg = null, threshold = 0.8, bgImgWidth = 0, bgImgHeight = 0) {
+        var result = { code: 200, message: '' };
+        try {
+            //开始识别
+            if (templateImg) {
+                var resp = await this.rpaApi.ocrFindImgPosi(templateImg, bgImg, threshold, bgImgWidth, bgImgHeight);
+                return resp;
+            } else {
+                result.message = '参数1模板图文件名必传'
+                result.code = 400;
+            }
+        } catch (e) {
+            result.message = `处理过程出错：${e}`;
+            result.code = 400;
+        }
+        return JSON.stringify(result);
+    },
+
     //同步睡眠
     sleepSync(ms = 100) {
         const start = Date.now(); // 记录起始时间戳（毫秒）

@@ -13,7 +13,7 @@ var ____rpaName____ = {
      * 点击元素 会等待5秒元素出现 如果需要等待更长时间就使用等待指令
      * @param {any} elName 元素库保存的元素名
      * @param {any} useWinApi 使用真实鼠标 默认false
-     * @param {any} useChildPoup 使用父子弹窗 默认false
+     * @param {any} useChildPoup 使用父子弹窗 默认false 弃用
      * @param {any} index 如果要循环点击多个元素在此传入第几个匹配元素即可 注意0表示第一个元素 默认-1 表示点击单个元素如出现多个元素则抛异常
      */
     async click(elName, useWinApi = false, useChildPoup = false, index = -1) {
@@ -59,6 +59,19 @@ var ____rpaName____ = {
                 throw "等待5秒元素一直不可见 无法点击";
             }
         }
+    },
+    /**
+     * 点击图片
+     * @param {any} templateImg 模板图 如D:\test.png 或应用目录Image文件夹下文件名如test.png
+     * @param {any} threshold 匹配阈值（0~1，推荐值0.7到0.9 越接近1越严格 如果两张图片是从不同大小的相同背景截取下来的匹配度会大大降低 0.4以下才能匹配）
+     * @param {any} bgImgWidth 桌面宽度缩放为指定宽度 0表示不调整 主要解决换机器或桌面分辨率改变后模板图无法匹配模板图问题 设置截取图时的桌面分辨率即可 如1920
+     * @param {any} bgImgHeight 桌面高度缩放为指定高度 如1080
+     * @param {any} throwEx 是否抛出异常
+     */
+    async clickImg(templateImg, threshold = 0.8, bgImgWidth = 0, bgImgHeight = 0, throwEx = true) {
+        //先悬停再点击
+        await this.hoverImg(templateImg, threshold, bgImgWidth, bgImgHeight, throwEx);
+        await this.rpaApi.mouseClick(0, 0, true, false, true)
     },
     /**
      * 获取元素文本 返回数组每个元素是个对象包含 会等待5秒元素出现 如果需要等待更长时间就使用等待指令
@@ -138,23 +151,57 @@ var ____rpaName____ = {
             await this.focusChromeForm(useWinApi);
             await this.click(elName, true);
             await this.sleep(50);
-            await this.rpaApi.inputText(content, speed);
-        }
-        else {
-            if (await this.waitInDoc(elName)) {
-                var el = (await this.getElement(elName))[0];
-                if (el) {
-                    this.elementMoveVisible(el, "center", true);
-                    this.inputText(el, content);
-                }
+            await this.inputTextWin(content, speed);
+        } else {
+            var el = await this.waitInDoc(elName, 20, true, true);
+            if (el) {
+                this.elementMoveVisible(el, "center", true);
+                this.inputText(el, content);
             } else {
                 throw "未匹配到元素：" + elName;
             }
         }
     },
-
     /**
-     * 等待元素消失在文档中
+     * 在输入框按下并弹起指定key 如按下回车键
+     * @param {any} elName 元素库保存的元素名 必须是input元素
+     * @param {any} keyCode 常用键码：13=Enter（默认）、9=Tab、27=Escape、32=Space、8=Backspace
+     */
+    async inputKey(elName, keyCode = 13) {
+        //等待元素出现
+        var elItems = [];
+        for (var i = 0; i < 5 * 2; i++) {
+            if (this.stop) { break; }
+            await this.sleep(500);
+            elItems = await this.getElement(elName);
+            if (elItems.length > 0) {
+                break;
+            }
+        }
+        if (elItems.length == 0) {
+            throw `未找到元素：${elName} 页面可能发生变动请在元素库重新捕获元素`;
+        }
+        if (elItems.length > 1) {
+            throw "发现多个元素 页面可能发生变动请在元素库重新捕获元素";
+        }
+
+        var el = elItems[0];
+        //不在视图区域则尝试移动
+        this.elementMoveVisible(el, "center", true);
+        el.dispatchEvent(new KeyboardEvent('keydown', {
+            keyCode,
+            bubbles: true,              // 事件冒泡（必须开启，否则部分框架监听不到）
+            cancelable: true
+        }));
+        await this.sleep(50);
+        el.dispatchEvent(new KeyboardEvent('keyup', {
+            keyCode,
+            bubbles: true,
+            cancelable: true
+        }));
+    },
+    /**
+     * 等待元素消失在文档中 返回true则表示消失 false或者异常表示未消失
      * @param {any} elName 元素库保存的元素名
      * @param {any} waitSecond 等待秒数 默认20秒
      * @param {any} throwEx 超时不消失是否抛出异常 默认false
@@ -177,36 +224,40 @@ var ____rpaName____ = {
         }
     },
     /**
-     * 等待元素出现在文档中
+     * 等待元素出现在文档中 返回true则表示已存在
      * @param {any} elName 元素库保存的元素名
      * @param {any} waitSecond 等待秒数 默认20秒
      * @param {any} throwEx 超时不存在是否抛出异常 默认true  检测元素是否存在传false
+     * @param {any} returnEl 若发现元素是否返回元素 默认false 跨页面调用返回元素可能导致页面崩溃
      * @returns 返回第一个匹配的元素 返回null表示未出现
      */
-    async waitInDoc(elName, waitSecond = 20, throwEx = true) {
+    async waitInDoc(elName, waitSecond = 20, throwEx = true, returnEl = false) {
         for (var i = 0; i < waitSecond * 2; i++) {
             if (this.stop) { break; }
             await this.sleep(500);
             var elItems = await this.getElement(elName);
             if (elItems.length > 0) {
-                //return true;
-                return elItems[0];
+                if (returnEl) {
+                    return elItems[0];                                    //直接返回这个可能导致页面崩溃
+                }
+                return true;
             }
         }
         if (throwEx) {
             throw `等待元素 ${elName} 出现在文档中超时`;
         } else {
-            return null
+            return false
         }
     },
     /**
-     * 等待元素出现在可视区域中
+     * 等待元素出现在可视区域中 返回ture表示已出现
      * @param {any} elName 元素库保存的元素名
      * @param {any} waitSecond 等待秒数 默认20秒
      * @param {any} throwEx 超时不存在是否抛出异常 默认true  检测元素是否存在传false
-     * @returns 返回第一个匹配的可见元素 返回null表示未出现
+     * @param {any} returnEl 若发现元素是否返回元素 默认false 跨页面调用返回元素可能导致页面崩溃
+     * @returns 
      */
-    async waitVisible(elName, waitSecond = 20, throwEx = true) {
+    async waitVisible(elName, waitSecond = 20, throwEx = true, returnEl = false) {
         var elItems = [];
         for (var i = 0; i < waitSecond * 2; i++) {
             if (this.stop) { break; }
@@ -220,28 +271,82 @@ var ____rpaName____ = {
             var el = elItems[i];
             var r = await this.waitElementVisible(el);
             if (r) {
-                //return true;
-                return el;
+                if (returnEl) {
+                    return el;
+                }
+                return true;
             }
         }
         if (throwEx) {
             throw `等待元素 ${elName} 出现在可视区域中超时`;
         } else {
-            return null
+            //return null
+            return false;
         }
     },
     /**
-     * 鼠标悬停在元素上
-     * @param {any} elName 元素库保存的元素名 
-     * @returns 返回第一个匹配到的元素 没有则返回null
+     * 等待图片出现在屏幕可视区域中
+     * @param {any} templateImg 应用图片文件夹文件名或完整路劲
+     * @param {any} threshold
+     * @param {any} bgImgWidth
+     * @param {any} bgImgHeight
+     * @param {any} waitSecond  等待秒数 默认20秒
+     * @param {any} throwEx 超时不存在是否抛出异常 默认true  检测元素是否存在传false
+     * @returns
      */
-    async hover(elName, useWinApi = false) {
-        var el = await this.waitVisible(elName);
-        if (el) {
-            if (useWinApi) await this.focusChromeForm(useWinApi);
-            await this.hoverCEF(el, useWinApi);
+    async waitVisibleImg(templateImg, threshold = 0.8, bgImgWidth = 0, bgImgHeight = 0, waitSecond = 20, throwEx = true) {
+        for (var i = 0; i < waitSecond; i++) {
+            if (this.stop) { break; }
+            await this.sleep(1000);
+            let posiResp = JSON.parse(await this.ocrFindImgPosi(templateImg, null, threshold, bgImgWidth, bgImgHeight));
+            if (posiResp.code == 200 && posiResp.data && posiResp.data.findImagePosiItems && posiResp.data.findImagePosiItems.length > 0) {
+                let rect = posiResp.data.findImagePosiItems[0];
+                return rect;
+                break;
+            } else {
+                //this.error(`图片识别失败：`, posiResp);
+            }
         }
+        if (throwEx) {
+            throw `等待图片 ${templateImg} 出现在可视区域中超时`;
+        } else {
+            return null;
+        }
+    },
+    /**
+     * 鼠标悬停在元素上 返回true成功
+     * @param {any} elName 元素库保存的元素名 
+     * @param {any} throwEx 超时不存在是否抛出异常 默认true  检测元素是否存在传false
+     * @returns
+     */
+    async hover(elName, useWinApi = false, throwEx = true) {
+        var el = await this.waitInDoc(elName, 20, throwEx, true);
+        if (!el) {
+            return false;
+        }
+        this.elementMoveVisible(el, "center", true);
+        if (useWinApi) await this.focusChromeForm(useWinApi);
+        await this.hoverCEF(el, useWinApi);
         await this.sleep(200);
+        return true;
+    },
+    /**
+     * 鼠标悬停在图片上 返回true成功
+     * @param {any} templateImg
+     * @param {any} threshold
+     * @param {any} bgImgWidth
+     * @param {any} bgImgHeight
+     * @param {any} throwEx 超时不存在是否抛出异常 默认true
+     * @returns
+     */
+    async hoverImg(templateImg, threshold = 0.8, bgImgWidth = 0, bgImgHeight = 0, throwEx = true) {
+        var rect = await this.waitVisibleImg(templateImg, threshold, bgImgWidth, bgImgHeight, 20, throwEx);
+        if (!rect) {
+            return false;
+        }
+        await this.rpaApi.mouseHover(rect.left + rect.width / 2, rect.top + rect.height / 2, true, true, true)
+        await this.sleep(200);
+        return true;
     },
 
     /**
@@ -353,7 +458,7 @@ var ____rpaName____ = {
         return true;
     },
     /**
-     * 获取多标签页配置信息 返回对象 失败返回null
+     * 获取多标签页配置信息 返回对象 失败返回null  成功：{id, url, title, domain}
      * @param {any} keyword 网页url或标题关键字 取不变的部分 不传则获取当前打开的页面
      * @param {any} waitSecond 等待加载完成秒数
      */
@@ -515,7 +620,7 @@ var ____rpaName____ = {
         return resp.body;
     },
     /**
-     * 在指定页面执行rpa方法 前面两个参数必填 注意后面可继续增加参数是传入调用rpa方法的 会等待页面加载完成再执行
+     * 在指定页面执行rpa方法 前面两个参数必填 从第三个参数开始是传入调用rpa方法的 会等待页面加载完成再执行
      * @param {any} id 页面id
      * @param {any} rpaFuncName rpa方法名 必须是rpa对象内方法
      * @returns 返回指定页面方法返回数据 失败返回null
@@ -771,7 +876,7 @@ var ____rpaName____ = {
 
     /**
      * 显示配置弹窗 等待弹窗关闭方法才返回配置结果
-     * @param {any} htmlName
+     * @param {any} htmlName        Html文件夹内的文件名如：vueTemplate.html 或者传入http://xxxx.html
      * @param {any} jsonAppConfig 传给弹窗json字符串 在弹窗调window.rpaVue.updateData这个方法传入参数
      * @param {any} width               宽度 
      * @param {any} height              高度 尺寸同时设置0最大化
@@ -911,10 +1016,11 @@ var ____rpaName____ = {
     /**
      * 反馈跟踪信息 同时支持运行界面点击暂停、停止 注意停止会抛出异常 
      * @param {any} msg 同时在运行指令显示执行指令的位置显示消息 为空则不显示不更新原消息
+     * @param {any} feedbackTrack 手动点击停止后是否触发异常
      */
-    async feedbackTrack(msg = '') {
+    async feedbackTrack(msg = '', feedbackTrack = true) {
         if (window.rpaVue) {
-            await window.rpaVue.scriptFeedbackTrack(msg);
+            await window.rpaVue.scriptFeedbackTrack(msg, feedbackTrack);
         }
     },
 
@@ -1580,7 +1686,7 @@ ${valuesClauses.join(',\n')};`;
      * @param {any} offsetX 水平偏移量 往右+ 往下+
      * @param {any} offsetY 垂直偏移量
      * @param {any} useWinApi 是否使用winApi 可以看到鼠标移动轨迹建议测试用
-     * @returns 响应识别结果json对象 { code: 200, data: { slideImageLeftPercent: 0.9 } }
+     * @returns 响应识别结果字符串 { code: 200, data: { slideImageLeftPercent: 0.9 } }
      */
     async ocrGapSliderImage(bgName = null, slideName = null, bgImgUrl = null, slideImgUrl = null, offsetX = 0, offsetY = 0, useWinApi = false) {
         var result = { code: 200, message: '' };
@@ -1659,9 +1765,9 @@ ${valuesClauses.join(',\n')};`;
 
     /**
      * 识别图形验证码 返回文本验证码 建议获取结果后先校验验证码位数是否符合再继续操作
-     * @param {any} imgName 图片保存到元素库名称
+     * @param {any} imgName 图片保存到元素库名称 或直接传入元素
      * @param {any} imgUrl 图片url或base64字符串 优先级比imgName高 二选一
-     * @returns 响应识别结果json对象 { code: 200, data: 'xxxx' }
+     * @returns 响应识别结果字符串 { code: 200, data: 'xxxx' }
      */
     async ocrImgVerifyCode(imgName = null, imgUrl = null) {
         var result = { code: 200, message: '' };
@@ -1693,9 +1799,8 @@ ${valuesClauses.join(',\n')};`;
 
             //开始识别
             if (bgBase64) {
-                var resp = JSON.parse(await this.rpaApi.ocrImgVerifyCode(bgBase64));
-                //console.log('识别结果：', resp); 
-                return JSON.stringify(resp);
+                var resp = await this.rpaApi.ocrImgVerifyCode(bgBase64);
+                return resp;
             } else {
                 result.message = '未获取到滑块图和背景图参数'
                 result.code = 400;
@@ -1706,6 +1811,34 @@ ${valuesClauses.join(',\n')};`;
         }
         return JSON.stringify(result);
     },
+
+    /**
+     * 识别图片在屏幕截图位置矩形 注意只能在主显示器截图查找 多显示器不支持
+     * @param {any} templateImg 模板图 如D:\test.png 或应用目录Image文件夹下文件名如test.png
+     * @param {any} bgImg 背景图传null则表示取主显示器截图 如D:\test.png 或应用目录Image文件夹下文件名如test.png
+     * @param {any} threshold 匹配阈值（0~1，推荐值0.7到0.9 越接近1越严格 如果两张图片是从不同大小的相同背景截取下来的匹配度会大大降低 0.4以下才能匹配）
+     * @param {any} bgImgWidth 背景图片缩放为指定宽度 0表示用当前传入的背景图不调整 主要用于解决背景图片和截取的模板图片时的背景图大小不一致问题
+     * @param {any} bgImgHeight 背景图片缩放为指定高度
+     * @returns 响应识别结果字符串 { code: 200, data: 'xxxx' }
+     */
+    async ocrFindImgPosi(templateImg, bgImg = null, threshold = 0.8, bgImgWidth = 0, bgImgHeight = 0) {
+        var result = { code: 200, message: '' };
+        try {
+            //开始识别
+            if (templateImg) {
+                var resp = await this.rpaApi.ocrFindImgPosi(templateImg, bgImg, threshold, bgImgWidth, bgImgHeight);
+                return resp;
+            } else {
+                result.message = '参数1模板图文件名必传'
+                result.code = 400;
+            }
+        } catch (e) {
+            result.message = `处理过程出错：${e}`;
+            result.code = 400;
+        }
+        return JSON.stringify(result);
+    },
+
     //同步睡眠
     sleepSync(ms = 100) {
         const start = Date.now(); // 记录起始时间戳（毫秒）
@@ -2038,7 +2171,8 @@ ${valuesClauses.join(',\n')};`;
             //if ('value' in el) {
             //    el.focus();
             //    el.select();
-            //    el.value = content                            //这种方式部分页面无效
+            //    el.value = content                                       //这种方式部分页面无效
+            //    el.dispatchEvent(new Event('input'));            //触发 input 事件（让网页知道值变了）
             //} else {
             //命令名	作用	是否需要第三个参数	参数示例
             //insertHTML	插入 HTML 代码（你使用的命令）	是	"<img src='pic.jpg'>"、"<a href='url'>链接</a>"
@@ -2062,6 +2196,14 @@ ${valuesClauses.join(',\n')};`;
             document.execCommand("insertText", "false", content);   //https://developer.mozilla.org/zh-CN/docs/Web/API/Document/execCommand
             //}
         }
+    },
+    /**
+     * 输入文本 使用系统模拟输入
+     * @param {any} content 文本内容
+     * @param {any} speed speed范围1到100 越大越快
+     */
+    async inputTextWin(content, speed = 50) {
+        return await this.rpaApi.inputText(content, speed);
     },
     /**
      * 鼠标单击 用cef鼠标事件
@@ -2214,9 +2356,9 @@ ${valuesClauses.join(',\n')};`;
         //文档：https://www.runoob.com/jsref/met-win-open.html
         window.open = function (url, name = '_blank', specs = '', replace = false) {
             try {
-                if (!url) {
-                    return null;                            //优化部分页面弹出前会弹空白页导致后面要加载url无法加载问题 若要打开空白页传"about:blank"
-                }
+                //if (!url) {
+                //    return null;                            //优化部分页面弹出前会弹空白页导致后面要加载url无法加载问题 若要打开空白页传"about:blank"    会导致window.open()不传参数打不开窗口
+                //}
                 that.rpaApi.windowOpenBefore(url || '', name, specs, replace);
             } catch (e) {
                 //console.error(`overrideWindowOpen执行出错：`, e);
@@ -2225,7 +2367,7 @@ ${valuesClauses.join(',\n')};`;
             var openResult = window.____rpaName_____native_window_open.call(window, url, name, specs, replace);                   //使用原生window.open打开窗口
             //console.log('打开子弹窗成功', openResult)
             //that.sleepSync(1000)
-            return openResult
+            return openResult               //  还有一种情况先打开空白页然后根据返回的结果 openResult.location = xxx;
         };
         //console.log('重写window.open成功')
     },
@@ -2236,7 +2378,7 @@ ${valuesClauses.join(',\n')};`;
 
     intervalPtr: 0,                 //计时器标识
     selectElement: null,        //最近一次抓取的元素 
-    //当前编辑的元素id 
+    //当前编辑的元素id 不等于-1是编辑
     editId: -1,
     //最近一次抓取并保存的元素
     lastSaveGrabElement: null,
@@ -2262,6 +2404,7 @@ ${valuesClauses.join(',\n')};`;
             var that = this;
             //console.log('that：', that);
             if (!this.intervalPtr) {
+                ____rpaName____.rpaApi.showNavMessageBoxMsg('按住Alt键移动鼠标选中元素 再按X键抓取元素 松开Alt键会取消操作');
                 this.intervalPtr = setInterval(async function () {
                     //坐标对应的元素
                     var el = document.elementFromPoint(mouseX, mouseY);
@@ -2271,7 +2414,7 @@ ${valuesClauses.join(',\n')};`;
                         var rect = el.getBoundingClientRect();
                         var rectArr = [];
                         rectArr.push(rect);
-                        if (await ____rpaName____.rpaApi.drawHtmlElementRect(JSON.stringify(rectArr), false) == "停止抓取元素") {
+                        if (await ____rpaName____.rpaApi.drawHtmlElementRect(JSON.stringify(rectArr), false, this.editId != -1) == "停止抓取元素") {
                             that.grabElementEnd(false);
                         }
                     }
@@ -2286,13 +2429,11 @@ ${valuesClauses.join(',\n')};`;
     grabElementEnd(opMode = false) {
         try {
             //防止结束重复操作
-            if (!this.intervalPtr || !this.selectElement) {
-                return;
-            }
-
+            if (!this.intervalPtr) { return; }
             clearInterval(this.intervalPtr);
             this.intervalPtr = 0;
 
+            if (!this.selectElement) { return; }
             if (opMode) {
                 if (this.debug) {
                     console.log("本次抓取到元素：", this.selectElement, "\n类名：", this.selectElement.className);
@@ -2302,10 +2443,14 @@ ${valuesClauses.join(',\n')};`;
                 this.grabElementSelector(this.selectElement);
             } else {
                 if (this.debug) {
-                    //console.log("取消抓取元素");
+                    console.log("取消抓取元素");
                 }
                 this.selectElement = null;
                 ____rpaName____.rpaApi.stopDrawHtmlElementRect();
+                //如果是编辑元素取消抓取元素则直接激活编辑弹窗
+                if (this.editId != -1) {
+                    ____rpaName____.rpaApi.showCheckElement()
+                }
             }
         } catch (e) {
             if (this.debug) {
@@ -3060,7 +3205,7 @@ ${valuesClauses.join(',\n')};`;
 //重写window.open
 ____rpaName____.overrideWindowOpen();
 if (window.____rpaApiName____) {
-    ____rpaName____.rpaApi = window.____rpaApiName____                                  //在其他环境尝试赋值一下
+    ____rpaName____.rpaApi = window.____rpaApiName____                                  //在运行任务环境绑定cs对象 在网页注册时不用这里绑定而是在加载页面前注入绑定js里赋值
 }
 if (____rpaName____.debug) {
     console.log('rpa加载完成');

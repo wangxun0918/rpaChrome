@@ -2348,7 +2348,7 @@ message ResponseInnerMessage {
 
   //获取店铺账号信息
   async getAccountInfo(regionCode) {
-    var resp = await this.fetchJsonAsync(`${appData.GetDomain()}api/v1/affiliate/account/info?account_type=1&shop_region=${regionCode}`, {
+    var resp = await this.fetchJsonAsync(`${appData.GetDomain()}api/v1/affiliate/account/info_v2?account_type=1&shop_region=${regionCode}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",

@@ -6,6 +6,10 @@ var appData = {
 
   cookie: "",
 
+  /**
+   * 运行任务的tk页面域名部分
+   */
+  tkDomain: '',
   siteId: 0,
   regionCode: "",
 

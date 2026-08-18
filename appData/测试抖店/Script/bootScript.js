@@ -101,7 +101,7 @@ var bootScript = {
         let addCount = 0
         for (const key of Object.keys(respObj.data.orderIdToContactLinkInfo)) {
           if (respObj.data.orderIdToContactLinkInfo[key].urlPc && !this.orderBuyerItems.Any(w => w.pigeonUid == respObj.data.orderIdToContactLinkInfo[key].pigeonUid)) {
-            var urlParams = rpa.parseUrl(respObj.data.orderIdToContactLinkInfo[key].urlPc).params
+            var urlParams = rpa.parseUrl(this.pageOrderInfo.domain + respObj.data.orderIdToContactLinkInfo[key].urlPc).params
             if (urlParams) {
               appData.regionCode = urlParams.shop_region
               this.orderBuyerItems.push({
@@ -164,15 +164,11 @@ var bootScript = {
     // await rpa.cancelReqMon(this.pageFindCreator, keywordShopInfo);
     // var respShopInfo = JSON.parse(this.shopInfoConfig.respBody);
     var respShopInfo = await tikTokApi.getAccountInfo(appData.TKFindCreatorUrlInfo.params.shop_region);
-    if (respShopInfo != null && respShopInfo.code == 0) {
-      respShopInfo.shop_info.forEach((element) => {
-        if (element.region == respShopInfo.region) {
-          appData.siteId = 8;
-          appData.regionCode = respShopInfo.region;
-          appData.shopId = element.shop_id;
-          appData.shopName = element.shop_name;
-        }
-      });
+    if (respShopInfo != null && respShopInfo.data) {
+      // appData.siteId = 8;                                //shop_code是CN开头一般都是跨境店
+      appData.regionCode = respShopInfo.data.shop.region;
+      appData.shopId = respShopInfo.data.shop.shop_id;
+      appData.shopName = respShopInfo.data.shop.shop_name;
     } else {
       console.error("获取店铺信息失败！！！");
       return;
@@ -253,9 +249,10 @@ var bootScript = {
       //打开邀约配置页 到此处查找达人配置已获取完成
       await this.openInvitePage();
       await rpa.activePage(this.pageCreateInvite, true);
-      //监控邀约请求 完成取消
+      //监控达人和商品检测请求 完成取消 模拟商品和达人检测不冲突防止加不了商品
       var keyword2 = `api/v1/oec/affiliate/seller/invitation_group/conflict_check`;
       await rpa.regReqMon(this.pageCreateInvite, keyword2, `window.bootScript.onCheckInvite`, null, null, false, { code: 0, data: {}, message: "success" });
+      //监控邀约请求 截取邀约配置 并拦击发送请求 模拟发送错误请求并提示消息
       var keyword3 = `api/v1/oec/affiliate/seller/invitation_group/create`;
       await rpa.regReqMon(this.pageCreateInvite, keyword3, `window.bootScript.onInvite`, null, null, false, { code: 1, message: "获取邀约配置成功 本次邀约请求已截取未发送 请点击任务页面立即执行" });
       rpa.runMessage("请在邀约页面选1个达人其它条件配置好 点击发送（本次发送会拦截将记录配置后续为您自动寻找达人发送）");
@@ -799,7 +796,28 @@ var bootScript = {
   async createOrderChatTask() {
     const taskType = "订单私信";
 
-    //获取或创建配置
+    //#region 获取店铺和首页订单信息
+
+    this.pageOrderInfo = await rpa.getPage("/order?", 2);
+    if (!this.pageOrderInfo) {
+      throw "请打开tk店铺并切到 订单->管理订单 页面配置好筛选订单条件再启动应用";
+    }
+
+    await rpa.instructMessage("打开店铺订单->管理订单页 设置筛选条件点击下一步");
+    await bootScript.showDialogForm(`createTkOrderChat.html?step=1`, null, 800, 175, -1, 0, true);       //打开窗口提示操作下一步
+
+    var keyword = `api/seller/mGetContactBuyerLinkByOrder`;             //订单接口关键字 监控获取店铺信息
+    await rpa.regReqMon(this.pageOrderInfo.id, keyword, `window.bootScript.onGetContactBuyer`, null, null, false);
+    //等会点击下一步表示确定选择好条件 执行一次点击搜索按钮
+    setTimeout(async () => {
+      await rpa.callPageRpa(this.pageOrderInfo.id, "inputKey", "订单页搜索框", 13);
+    }, 1000);
+    await rpa.instructMessage("等待点击搜索订单按钮获取店铺信息");
+    await rpa.wait(0, "waitGetContactBuyer");                         //等待请求任务响应
+
+    //#endregion
+
+    //获取或创建配置 要先根据订单接口获取到地区和店铺id
     var defConfig = {
       id: appData.getUUID(),
       name: "订单私信_" + DateTime.Now.ToString("yyyyMMdd"),
@@ -817,7 +835,6 @@ var bootScript = {
       skipChated: false, //已沟通都跳过
       skipReply: false, //跳过待回复 
     };
-
     var appInfo = await rpa.getAppInfo();
     if (appInfo.RunParameter) {
       var runParam = JSON.parse(appInfo.RunParameter);
@@ -832,28 +849,7 @@ var bootScript = {
       };
     }
 
-    //#region 获取店铺和首页订单信息
-
-    this.pageOrderInfo = await rpa.getPage("/order?", 2);
-    if (!this.pageOrderInfo) {
-      throw "请打开tk店铺并切到 订单->管理订单 页面配置好筛选订单条件再启动应用";
-    }
-
-    await rpa.instructMessage("打开店铺订单->管理订单页 设置筛选条件点击下一步");
-    await bootScript.showDialogForm(`createTkOrderChat.html?step=1`, JSON.stringify(globalVar.AppRunParameters), 800, 175, -1, 0, true);       //打开窗口提示操作下一步
-
-    var keyword = `api/seller/mGetContactBuyerLinkByOrder`;             //订单接口关键字 监控获取店铺信息
-    await rpa.regReqMon(this.pageOrderInfo.id, keyword, `window.bootScript.onGetContactBuyer`, null, null, false);
-    //点击下一步表示确定选择好条件 执行一次点击搜索按钮
-    setTimeout(async () => {
-      await rpa.callPageRpa(this.pageOrderInfo.id, "click", "订单页搜索", true, false, 0);
-    }, 1000);
-    await rpa.instructMessage("等待点击搜索订单按钮获取店铺信息");
-    await rpa.wait(0, "waitGetContactBuyer");                         //等待请求任务响应
-
-    //#endregion
-
-    await rpa.instructMessage("等待配置任务参数");
+    await rpa.instructMessage("等待弹窗配置任务参数");
     // console.log('弹窗参数：', globalVar.AppRunParameters);
     globalVar.AppRunParameters = await bootScript.showDialogForm(`createTkOrderChat.html?step=2`, JSON.stringify(globalVar.AppRunParameters), 1500, 950, -1, -1, true);
     if (!globalVar.AppRunParameters) {
@@ -994,7 +990,7 @@ var bootScript = {
   async openOrderChatForm(buyerItem) {
     var orderPageKeyword = "/chat/inbox/current?"               //私信页url关键字
     try {
-      var url = buyerItem.urlPc;
+      var url = this.pageOrderInfo.domain + buyerItem.urlPc;
       var openChatParam = {
         type: "oec_im_pc_open_conversation",
         payload: buyerItem.urlParams,
